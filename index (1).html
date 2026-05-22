@@ -343,7 +343,7 @@
 // KONFIGŪRACIJA
 // ═══════════════════════════════════════════════════
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0bAmbozuC5DzZ5cpOWz54tpnqdzhoFG2Xu94qt3249WOAzjZgMi2HUZa8zhrkNuB5/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1FsL3aAlNEUfYjXl2Q7QxqzlrE7C_liliWInxe1J9RXjZtVES5FP_zNDWfUEphuiW/exec'; 
 
 const MODELS = {};
 ['b1_lin','b1_neu','b1_liu',
@@ -702,10 +702,18 @@ function updatePageStatus() {
 // NAVIGACIJA
 // ═══════════════════════════════════════════════════
 
-function changePage(dir) {
+async function changePage(dir) {
   pauseAllAudio();
   const newPage = S.curPage + dir;
   if (newPage < 0 || newPage >= PAGES_PER_SESSION) return;
+
+  // Siųsti dabartinio puslapio duomenis kai einame pirmyn
+  if (dir > 0) {
+    const sess  = S.sessions[S.curSess];
+    const items = sess.slice(S.curPage*ITEMS_PER_PAGE,(S.curPage+1)*ITEMS_PER_PAGE);
+    await sendPage(items);
+  }
+
   S.curPage = newPage;
   renderPage();
   window.scrollTo({top:0, behavior:'smooth'});
@@ -715,12 +723,42 @@ function changePage(dir) {
 // IŠSAUGOJIMAS
 // ═══════════════════════════════════════════════════
 
+async function sendPage(items) {
+  // Siųsti tik atsakytus šio puslapio įrašus
+  const rows = items
+    .filter(item => S.answers[item.id]?.mos)
+    .map(item => ({
+      pid:     S.pid,
+      session: S.curSess+1,
+      page:    S.curPage+1,
+      itemId:  item.id,
+      model:   item.model,
+      file:    item.file,
+      mos:     S.answers[item.id]?.mos||'',
+      emotion: S.answers[item.id]?.emotion||'',
+      plays:   S.playCounts[item.id]||0,
+      ts:      new Date().toISOString(),
+    }));
+
+  if (rows.length === 0) return;
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({rows}),
+    });
+    console.log(`Puslapis ${S.curPage+1} išsaugotas: ${rows.length} įrašų`);
+  } catch(e) {
+    console.warn('Siuntimo klaida:', e);
+  }
+}
+
 async function saveSession() {
   const sess = S.sessions[S.curSess];
   const missing = sess.filter(it=>!S.answers[it.id]?.mos);
   if (missing.length>0) {
     alert(`Dar ${missing.length} neįvertintų įrašų. Prašome įvertinti visus.`);
-    // Eiti į pirmą puslapį su neatsakytais
     for (let p=0;p<PAGES_PER_SESSION;p++) {
       const sl = sess.slice(p*ITEMS_PER_PAGE,(p+1)*ITEMS_PER_PAGE);
       if (sl.some(it=>!S.answers[it.id]?.mos)) { S.curPage=p; renderPage(); break; }
@@ -730,16 +768,18 @@ async function saveSession() {
 
   pauseAllAudio();
 
+  // Siųsti visą seansą galutinai
   const rows = sess.map(item=>({
-    pid: S.pid,
+    pid:     S.pid,
     session: S.curSess+1,
-    itemId: item.id,
-    model: item.model,
-    file: item.file,
-    mos: S.answers[item.id]?.mos||'',
+    page:    'final',
+    itemId:  item.id,
+    model:   item.model,
+    file:    item.file,
+    mos:     S.answers[item.id]?.mos||'',
     emotion: S.answers[item.id]?.emotion||'',
-    plays: S.playCounts[item.id]||0,
-    ts: new Date().toISOString(),
+    plays:   S.playCounts[item.id]||0,
+    ts:      new Date().toISOString(),
   }));
 
   try {
