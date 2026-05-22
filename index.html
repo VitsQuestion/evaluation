@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalbos sintezės vertinimas</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg:     #0F1117;
+    --bg2:    #171B26;
+    --bg3:    #1E2333;
+    --border: #2A2F42;
+    --teal:   #0D9488;
+    --tealLt: #5EEAD4;
+    --white:  #F0F4F8;
+    --gray:   #8892A4;
+    --grayDk: #4A5568;
+    --orange: #F97316;
+    --green:  #22C55E;
+    --purple: #6D6875;
+    --blue:   #457B9D;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--white);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1rem;
+    color: var(--tealLt);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+  .header-sep { flex: 1; }
+  .hdr-info {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--gray);
+    display: none;
+  }
+  .prog-wrap { display: flex; align-items: center; gap: 0.7rem; }
+  .prog-label { font-size: 0.78rem; color: var(--gray); font-family: 'IBM Plex Mono', monospace; }
+  .prog-bar { width: 140px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .prog-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--tealLt)); border-radius: 2px; transition: width 0.3s; }
+
+  /* Screens */
+  .screen { display: none; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* Welcome */
+  #sc-welcome {
+    justify-content: center; align-items: center;
+    min-height: calc(100vh - 65px); padding: 2rem;
+  }
+  .welcome-card {
+    max-width: 620px; width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2.8rem;
+    text-align: center;
+  }
+  .welcome-card h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .welcome-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem; color: var(--tealLt);
+    letter-spacing: 0.1em; margin-bottom: 2rem;
+  }
+  .welcome-card p { color: var(--gray); line-height: 1.7; font-size: 0.92rem; margin-bottom: 1rem; }
+  .instr {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.2rem 1.5rem;
+    margin: 1.5rem 0; text-align: left;
+  }
+  .instr li { color: var(--gray); font-size: 0.88rem; line-height: 1.9; margin-left: 1.2rem; }
+  .instr li strong { color: var(--white); }
+
+  /* Sessions */
+  #sc-sessions {
+    justify-content: center; align-items: center;
+    min-height: calc(100vh - 65px); padding: 2rem;
+  }
+  .sess-wrap { max-width: 580px; width: 100%; text-align: center; }
+  .sess-wrap h2 { font-size: 1.4rem; margin-bottom: 0.4rem; }
+  .sess-wrap > p { color: var(--gray); font-size: 0.88rem; margin-bottom: 2rem; }
+  .sess-cards { display: flex; flex-direction: column; gap: 0.8rem; }
+  .sess-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.1rem 1.4rem;
+    display: flex; align-items: center; gap: 1rem;
+    cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    text-align: left;
+  }
+  .sess-card:hover:not(.done):not(.locked) { border-color: var(--teal); background: var(--bg3); }
+  .sess-card.done { border-color: var(--green); opacity: 0.75; cursor: default; }
+  .sess-card.locked { opacity: 0.38; cursor: not-allowed; }
+  .sess-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.6rem; font-weight: 500; color: var(--teal); min-width: 2rem;
+  }
+  .sess-card.done .sess-num { color: var(--green); }
+  .sess-info { flex: 1; }
+  .sess-title { font-weight: 500; font-size: 0.93rem; }
+  .sess-meta { font-size: 0.78rem; color: var(--gray); margin-top: 0.2rem; }
+  .sess-badge {
+    font-size: 0.73rem; padding: 0.2rem 0.7rem;
+    border-radius: 20px; font-family: 'IBM Plex Mono', monospace; white-space: nowrap;
+  }
+  .b-done  { background: rgba(34,197,94,.15); color: var(--green); }
+  .b-start { background: rgba(13,148,136,.15); color: var(--tealLt); }
+  .b-lock  { background: var(--bg3); color: var(--grayDk); }
+
+  /* Eval */
+  #sc-eval { padding: 1.5rem 1.5rem 3rem; max-width: 900px; margin: 0 auto; width: 100%; }
+
+  .eval-top {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 1.5rem; flex-wrap: wrap;
+  }
+  .ev-badge {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem;
+    color: var(--tealLt); background: rgba(13,148,136,.12);
+    padding: 0.28rem 0.8rem; border-radius: 20px;
+  }
+  .ev-page-dots { display: flex; gap: 0.4rem; align-items: center; }
+  .dot {
+    width: 28px; height: 6px; border-radius: 3px;
+    background: var(--border); cursor: pointer; transition: background 0.2s;
+  }
+  .dot.done { background: var(--teal); }
+  .dot.active { background: var(--tealLt); }
+  .ev-count { font-size: 0.8rem; color: var(--gray); font-family: 'IBM Plex Mono', monospace; margin-left: auto; }
+
+  /* Grid of items */
+  .items-grid { display: flex; flex-direction: column; gap: 1rem; }
+
+  /* Item card */
+  .item-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.4rem 1.6rem;
+    transition: border-color 0.2s;
+  }
+  .item-card.answered { border-color: rgba(13,148,136,.5); }
+  .item-header {
+    display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem;
+  }
+  .item-num-badge {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem;
+    color: var(--grayDk); letter-spacing: 0.08em;
+  }
+  .item-answered-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--teal);
+    display: none;
+  }
+  .item-card.answered .item-answered-dot { display: block; }
+
+  /* Audio */
+  .audio-row {
+    display: flex; align-items: center; gap: 0.9rem;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 1.2rem;
+  }
+  .play-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--teal); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background 0.15s, transform 0.1s;
+  }
+  .play-btn:hover { background: var(--tealLt); }
+  .play-btn:active { transform: scale(0.93); }
+  .play-btn svg { width: 14px; height: 14px; fill: white; }
+  .audio-mid { flex: 1; min-width: 0; }
+  .audio-lbl { font-size: 0.7rem; color: var(--gray); margin-bottom: 0.25rem; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .audio-bar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .audio-fill { height: 100%; background: linear-gradient(90deg,var(--teal),var(--tealLt)); border-radius: 2px; width: 0%; transition: width 0.1s; }
+  .audio-time { font-size: 0.67rem; color: var(--grayDk); margin-top: 0.2rem; font-family: 'IBM Plex Mono', monospace; }
+  .play-cnt { font-size: 0.67rem; color: var(--grayDk); font-family: 'IBM Plex Mono', monospace; min-width: 24px; text-align: right; }
+
+  /* Questions inline */
+  .q-row { display: flex; align-items: flex-start; gap: 2rem; flex-wrap: wrap; }
+  .q-block { flex: 1; min-width: 200px; }
+  .q-lbl { font-size: 0.8rem; font-weight: 500; color: var(--white); margin-bottom: 0.5rem; }
+  .q-sub { font-size: 0.7rem; color: var(--grayDk); margin-bottom: 0.5rem; }
+
+  /* MOS */
+  .mos-btns { display: flex; gap: 0.35rem; }
+  .mos-btn {
+    flex: 1; padding: 0.45rem 0.2rem;
+    border: 1px solid var(--border); border-radius: 7px;
+    background: var(--bg3); color: var(--gray);
+    cursor: pointer; font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem; text-align: center; transition: all 0.12s;
+  }
+  .mos-btn:hover { border-color: var(--teal); color: var(--white); }
+  .mos-btn.sel { background: var(--teal); border-color: var(--teal); color: white; font-weight: 500; }
+  .mos-ends { display: flex; justify-content: space-between; margin-top: 0.25rem; }
+  .mos-ends span { font-size: 0.65rem; color: var(--grayDk); }
+
+  /* Emotion */
+  .emo-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .emo-btn {
+    padding: 0.4rem 0.9rem; border: 1px solid var(--border);
+    border-radius: 20px; background: var(--bg3); color: var(--gray);
+    cursor: pointer; font-size: 0.8rem; transition: all 0.12s;
+  }
+  .emo-btn:hover { border-color: var(--orange); color: var(--white); }
+  .emo-btn.sel-lin { background: var(--orange); border-color: var(--orange); color: white; font-weight: 500; }
+  .emo-btn.sel-neu { background: var(--blue);   border-color: var(--blue);   color: white; font-weight: 500; }
+  .emo-btn.sel-liu { background: var(--purple); border-color: var(--purple); color: white; font-weight: 500; }
+
+  /* Page nav */
+  .page-nav {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 1.8rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+  }
+  .nav-status { font-size: 0.8rem; color: var(--gray); }
+
+  /* Buttons */
+  .btn {
+    padding: 0.65rem 1.6rem; border-radius: 8px; border: none;
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 0.88rem;
+    font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--teal); color: white; }
+  .btn-primary:hover { background: var(--tealLt); color: var(--bg); }
+  .btn-primary:disabled { background: var(--grayDk); cursor: not-allowed; opacity: 0.5; }
+  .btn-ghost { background: transparent; color: var(--gray); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--gray); color: var(--white); }
+  .btn-ghost:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-lg { padding: 0.85rem 2.4rem; font-size: 0.95rem; }
+  .btns-row { display: flex; gap: 0.7rem; }
+
+  /* Done */
+  #sc-done {
+    justify-content: center; align-items: center;
+    min-height: calc(100vh - 65px); padding: 2rem; text-align: center;
+  }
+  .done-card {
+    max-width: 480px; background: var(--bg2);
+    border: 1px solid var(--green); border-radius: 14px; padding: 2.8rem;
+  }
+  .done-icon { font-size: 3rem; margin-bottom: 1rem; }
+  .done-card h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .done-card p { color: var(--gray); font-size: 0.88rem; line-height: 1.7; }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">Kalbos sintezės vertinimas</div>
+  <div class="header-sep"></div>
+  <div class="hdr-info" id="hdr-info"></div>
+  <div class="prog-wrap" id="hdr-prog" style="display:none">
+    <span class="prog-label" id="prog-lbl">0 / 50</span>
+    <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+  </div>
+</header>
+
+<!-- Welcome -->
+<div id="sc-welcome" class="screen active">
+  <div class="welcome-card">
+    <h1>Kalbos sintezės vertinimas</h1>
+    <p>Šios apklausos tikslas — įvertinti dirbtinio intelekto sintetizuotos lietuviškos kalbos natūralumą ir emocinę raišką.</p>
+    <div class="instr">
+      <ol>
+        <li><strong>Išklausykite</strong> kiekvieną garso įrašą</li>
+        <li><strong>Įvertinkite natūralumą</strong> skalėje 1–5</li>
+        <li><strong>Pasirinkite emociją</strong> kurią girdite</li>
+        <li>Apklausa sudaryta iš <strong>3 seansų</strong>, kiekvienas po ~15–20 min</li>
+        <li>Kiekviename seanse — <strong>5 puslapiai po 10 įrašų</strong></li>
+        <li>Tarp seansų galite <strong>pasiilsėti</strong></li>
+      </ol>
+    </div>
+    <p style="font-size:0.82rem;color:var(--grayDk)">Apklausa anoniminė. Duomenys naudojami tik moksliniais tikslais.</p>
+    <br>
+    <button class="btn btn-primary btn-lg" onclick="init()">Pradėti →</button>
+  </div>
+</div>
+
+<!-- Sessions -->
+<div id="sc-sessions" class="screen">
+  <div class="sess-wrap">
+    <h2>Pasirinkite seansą</h2>
+    <p>Seansus galite atlikti bet kokia tvarka. Rekomenduojame daryti trumpas pertraukas tarp seansų.</p>
+    <div class="sess-cards" id="sess-cards"></div>
+  </div>
+</div>
+
+<!-- Eval -->
+<div id="sc-eval" class="screen">
+  <div class="eval-top">
+    <span class="ev-badge" id="ev-badge">Seanso 1</span>
+    <div class="ev-page-dots" id="page-dots"></div>
+    <span class="ev-count" id="ev-count">Puslapis 1 / 5</span>
+  </div>
+  <div class="items-grid" id="items-grid"></div>
+  <div class="page-nav">
+    <span class="nav-status" id="nav-status"></span>
+    <div class="btns-row">
+      <button class="btn btn-ghost" id="btn-prev" onclick="changePage(-1)">← Atgal</button>
+      <button class="btn btn-primary" id="btn-next" onclick="changePage(1)">Toliau →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Done -->
+<div id="sc-done" class="screen">
+  <div class="done-card">
+    <div class="done-icon">✓</div>
+    <h2>Apklausa baigta!</h2>
+    <p>Dėkojame už dalyvavimą. Jūsų vertinimai išsaugoti ir bus naudojami magistro darbo tyrime.</p>
+    <br>
+    <p style="font-size:0.78rem;color:var(--grayDk)">Galite uždaryti šį langą.</p>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// KONFIGŪRACIJA
+// ═══════════════════════════════════════════════════
+
+const SCRIPT_URL = 'JŪSŲ_GOOGLE_APPS_SCRIPT_URL'; // ← pakeiskite
+
+const MODELS = {};
+['b1_lin','b1_neu','b1_liu',
+ 'b2_lin','b2_neu','b2_liu',
+ 'b3_lin','b3_neu','b3_liu',
+ 's_lin','s_neu','s_liu',
+ 'gt_lin','gt_neu','gt_liu'].forEach(m => {
+  MODELS[m] = Array.from({length:10}, (_,i) =>
+    `wavs/${m}/${m}_${String(i+1).padStart(2,'0')}.wav`
+  );
+});
+
+const ITEMS_PER_PAGE = 10;
+const PAGES_PER_SESSION = 5;
+const ITEMS_PER_SESSION = 50; // 5 × 10
+
+// ═══════════════════════════════════════════════════
+// BŪSENA
+// ═══════════════════════════════════════════════════
+
+let S = {
+  pid: null,
+  all: [],          // 150 sumaišytų įrašų
+  sessions: [],     // [[50 items],[50],[50]]
+  curSess: null,
+  curPage: 0,       // 0–4
+  answers: {},      // itemId -> {mos,emotion}
+  doneSess: [],
+  playCounts: {},   // itemId -> n
+};
+
+// ═══════════════════════════════════════════════════
+// PAGALBINĖS
+// ═══════════════════════════════════════════════════
+
+function shuffle(a) {
+  a = [...a];
+  for (let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sc-'+id).classList.add('active');
+  const hp = document.getElementById('hdr-prog');
+  hp.style.display = id==='eval' ? 'flex' : 'none';
+  window.scrollTo({top:0});
+}
+
+function pauseAllAudio() {
+  document.querySelectorAll('audio').forEach(a=>a.pause());
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+
+function init() {
+  S.pid = 'p_'+Date.now()+'_'+Math.random().toString(36).substr(2,5);
+
+  let all = [];
+  for (const [model, files] of Object.entries(MODELS)) {
+    files.forEach((file,i) => all.push({
+      id: `${model}_${i+1}`,
+      model, file
+    }));
+  }
+  S.all = shuffle(all);
+  S.sessions = [
+    S.all.slice(0,50),
+    S.all.slice(50,100),
+    S.all.slice(100,150),
+  ];
+
+  show('sessions');
+  renderSessions();
+}
+
+// ═══════════════════════════════════════════════════
+// SESSIONS
+// ═══════════════════════════════════════════════════
+
+function renderSessions() {
+  const c = document.getElementById('sess-cards');
+  c.innerHTML = '';
+  S.sessions.forEach((sess, i) => {
+    const done   = S.doneSess.includes(i);
+    const locked = false;
+    const ans    = sess.filter(it => S.answers[it.id]?.mos).length;
+
+    const card = document.createElement('div');
+    card.className = `sess-card ${done?'done':''} ${locked?'locked':''}`;
+    card.innerHTML = `
+      <div class="sess-num">${i+1}</div>
+      <div class="sess-info">
+        <div class="sess-title">Seanso ${i+1}</div>
+        <div class="sess-meta">50 garso įrašai · 5 puslapiai · ~15–20 min
+          ${!done && ans>0 ? ` · tęsiama (${ans}/50)`:''}</div>
+      </div>
+      <span class="sess-badge ${done?'b-done':locked?'b-lock':'b-start'}">
+        ${done?'✓ Atlikta':locked?'Užrakinta':ans>0?'Tęsti →':'Pradėti →'}
+      </span>`;
+    if (!done && !locked) card.onclick = ()=>startSession(i);
+    c.appendChild(card);
+  });
+}
+
+function startSession(i) {
+  S.curSess = i;
+  // Rasti pirmą puslapį su neatsakytais
+  const sess = S.sessions[i];
+  let startPage = 0;
+  for (let p=0;p<PAGES_PER_SESSION;p++) {
+    const slice = sess.slice(p*ITEMS_PER_PAGE,(p+1)*ITEMS_PER_PAGE);
+    if (slice.some(it=>!S.answers[it.id]?.mos)) { startPage=p; break; }
+    startPage = p;
+  }
+  S.curPage = startPage;
+  show('eval');
+  renderPage();
+}
+
+// ═══════════════════════════════════════════════════
+// PAGE RENDER
+// ═══════════════════════════════════════════════════
+
+function renderPage() {
+  const sess  = S.sessions[S.curSess];
+  const page  = S.curPage;
+  const items = sess.slice(page*ITEMS_PER_PAGE,(page+1)*ITEMS_PER_PAGE);
+
+  // Header info
+  document.getElementById('ev-badge').textContent = `Seanso ${S.curSess+1}`;
+  document.getElementById('ev-count').textContent = `Puslapis ${page+1} / ${PAGES_PER_SESSION}`;
+
+  // Progress bar (answered in whole session)
+  const totalAns = sess.filter(it=>S.answers[it.id]?.mos).length;
+  document.getElementById('prog-lbl').textContent = `${totalAns} / 50`;
+  document.getElementById('prog-fill').style.width = `${(totalAns/50)*100}%`;
+
+  // Page dots
+  const dotsEl = document.getElementById('page-dots');
+  dotsEl.innerHTML = '';
+  for (let p=0;p<PAGES_PER_SESSION;p++) {
+    const slice = sess.slice(p*ITEMS_PER_PAGE,(p+1)*ITEMS_PER_PAGE);
+    const allDone = slice.every(it=>S.answers[it.id]?.mos);
+    const d = document.createElement('div');
+    d.className = `dot ${allDone?'done':''} ${p===page?'active':''}`;
+    d.title = `Puslapis ${p+1}`;
+    d.onclick = ()=>{ pauseAllAudio(); S.curPage=p; renderPage(); };
+    dotsEl.appendChild(d);
+  }
+
+  // Nav status
+  const pageUnanswered = items.filter(it=>!S.answers[it.id]?.mos).length;
+  document.getElementById('nav-status').textContent =
+    pageUnanswered>0 ? `Šiame puslapyje liko: ${pageUnanswered} neįvertintų` : '✓ Puslapis įvertintas';
+
+  // Buttons
+  const prevBtn = document.getElementById('btn-prev');
+  const nextBtn = document.getElementById('btn-next');
+  prevBtn.disabled = page===0;
+  const isLast = page===PAGES_PER_SESSION-1;
+  const allSessAnswered = sess.every(it=>S.answers[it.id]?.mos);
+
+  if (isLast && allSessAnswered) {
+    nextBtn.textContent = 'Išsaugoti seansą ✓';
+    nextBtn.onclick = saveSession;
+  } else if (isLast) {
+    nextBtn.textContent = 'Peržiūrėti ←';
+    nextBtn.onclick = ()=>{ pauseAllAudio(); S.curPage=0; renderPage(); };
+  } else {
+    nextBtn.textContent = 'Toliau →';
+    nextBtn.onclick = ()=>changePage(1);
+  }
+
+  // Render items
+  const grid = document.getElementById('items-grid');
+  grid.innerHTML = '';
+  items.forEach((item, localIdx) => {
+    const globalIdx = page*ITEMS_PER_PAGE + localIdx;
+    const ans = S.answers[item.id] || {};
+    const card = document.createElement('div');
+    card.className = `item-card ${ans.mos?'answered':''}`;
+    card.id = `card-${item.id}`;
+
+    card.innerHTML = `
+      <div class="item-header">
+        <span class="item-num-badge">ĮRAŠAS ${globalIdx+1}</span>
+        <div class="item-answered-dot"></div>
+      </div>
+      <div class="audio-row" id="arow-${item.id}">
+        <button class="play-btn" onclick="togglePlay('${item.id}')">
+          <svg viewBox="0 0 24 24" id="picon-${item.id}"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="audio-mid">
+          <div class="audio-lbl" id="albl-${item.id}">Paspauskite ▶ klausytis</div>
+          <div class="audio-bar"><div class="audio-fill" id="afill-${item.id}"></div></div>
+          <div class="audio-time" id="atime-${item.id}">--:--</div>
+        </div>
+        <div class="play-cnt" id="pcnt-${item.id}"></div>
+      </div>
+      <audio id="aud-${item.id}" src="${item.file}" preload="metadata"></audio>
+
+      <div class="q-row">
+        <div class="q-block">
+          <div class="q-lbl">1. Natūralumas</div>
+          <div class="q-sub">1 = nenatūrali · 5 = natūrali</div>
+          <div class="mos-btns">
+            ${[1,2,3,4,5].map(n=>`
+              <button class="mos-btn ${ans.mos==n?'sel':''}"
+                onclick="setMos('${item.id}',${n})">${n}</button>
+            `).join('')}
+          </div>
+          <div class="mos-ends"><span>Nenatūrali</span><span>Natūrali</span></div>
+        </div>
+        <div class="q-block">
+          <div class="q-lbl">2. Emocija</div>
+          <div class="q-sub">Kurią emociją girdite?</div>
+          <div class="emo-btns">
+            <button class="emo-btn ${ans.emotion==='linksma'?'sel-lin':''}"
+              onclick="setEmo('${item.id}','linksma')">😊 Linksma</button>
+            <button class="emo-btn ${ans.emotion==='neutrali'?'sel-neu':''}"
+              onclick="setEmo('${item.id}','neutrali')">😐 Neutrali</button>
+            <button class="emo-btn ${ans.emotion==='liudna'?'sel-liu':''}"
+              onclick="setEmo('${item.id}','liudna')">😔 Liūdna</button>
+          </div>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+    setupAudio(item.id);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// AUDIO
+// ═══════════════════════════════════════════════════
+
+function setupAudio(id) {
+  const audio = document.getElementById(`aud-${id}`);
+  if (!audio) return;
+
+  audio.ontimeupdate = () => {
+    const pct = audio.duration ? (audio.currentTime/audio.duration)*100 : 0;
+    const f = document.getElementById(`afill-${id}`);
+    if (f) f.style.width = pct+'%';
+    const t = document.getElementById(`atime-${id}`);
+    if (t) t.textContent = fmt(audio.currentTime)+' / '+(isNaN(audio.duration)?'--:--':fmt(audio.duration));
+  };
+  audio.onplay = () => {
+    // Pause others
+    document.querySelectorAll('audio').forEach(a=>{ if(a!==audio) a.pause(); });
+    const ic = document.getElementById(`picon-${id}`);
+    if (ic) ic.setAttribute('d','M6 19h4V5H6v14zm8-14v14h4V5h-4z');
+    const lb = document.getElementById(`albl-${id}`);
+    if (lb) lb.textContent = 'Groja...';
+  };
+  audio.onpause = () => {
+    const ic = document.getElementById(`picon-${id}`);
+    if (ic) ic.setAttribute('d','M8 5v14l11-7z');
+    const lb = document.getElementById(`albl-${id}`);
+    if (lb && !audio.ended) lb.textContent = 'Paspauskite ▶ tęsti';
+  };
+  audio.onended = () => {
+    S.playCounts[id] = (S.playCounts[id]||0)+1;
+    const ic = document.getElementById(`picon-${id}`);
+    if (ic) ic.setAttribute('d','M8 5v14l11-7z');
+    const lb = document.getElementById(`albl-${id}`);
+    if (lb) lb.textContent = `Klausyta ${S.playCounts[id]}× — galite klausytis dar`;
+    const pc = document.getElementById(`pcnt-${id}`);
+    if (pc) pc.textContent = '×'+S.playCounts[id];
+    const f = document.getElementById(`afill-${id}`);
+    if (f) f.style.width='100%';
+  };
+}
+
+function togglePlay(id) {
+  const audio = document.getElementById(`aud-${id}`);
+  if (!audio) return;
+  audio.paused ? audio.play() : audio.pause();
+}
+
+function fmt(s) {
+  if (isNaN(s)) return '--:--';
+  return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
+
+// ═══════════════════════════════════════════════════
+// ATSAKYMAI
+// ═══════════════════════════════════════════════════
+
+function setMos(id, val) {
+  if (!S.answers[id]) S.answers[id] = {};
+  S.answers[id].mos = val;
+  // Update buttons
+  const card = document.getElementById(`card-${id}`);
+  if (card) {
+    card.querySelectorAll('.mos-btn').forEach((b,i)=>b.classList.toggle('sel',i+1===val));
+    card.classList.add('answered');
+  }
+  updatePageStatus();
+}
+
+function setEmo(id, emo) {
+  if (!S.answers[id]) S.answers[id] = {};
+  S.answers[id].emotion = emo;
+  const card = document.getElementById(`card-${id}`);
+  if (card) {
+    card.querySelectorAll('.emo-btn').forEach(b=>{
+      b.classList.remove('sel-lin','sel-neu','sel-liu');
+      if (b.textContent.includes('Linksma') && emo==='linksma') b.classList.add('sel-lin');
+      if (b.textContent.includes('Neutrali') && emo==='neutrali') b.classList.add('sel-neu');
+      if (b.textContent.includes('Liūdna') && emo==='liudna') b.classList.add('sel-liu');
+    });
+  }
+  updatePageStatus();
+}
+
+function updatePageStatus() {
+  const sess  = S.sessions[S.curSess];
+  const page  = S.curPage;
+  const items = sess.slice(page*ITEMS_PER_PAGE,(page+1)*ITEMS_PER_PAGE);
+  const pageUnanswered = items.filter(it=>!S.answers[it.id]?.mos).length;
+  document.getElementById('nav-status').textContent =
+    pageUnanswered>0 ? `Šiame puslapyje liko: ${pageUnanswered} neįvertintų` : '✓ Puslapis įvertintas';
+
+  // Progress
+  const totalAns = sess.filter(it=>S.answers[it.id]?.mos).length;
+  document.getElementById('prog-lbl').textContent = `${totalAns} / 50`;
+  document.getElementById('prog-fill').style.width = `${(totalAns/50)*100}%`;
+
+  // Update dots
+  for (let p=0;p<PAGES_PER_SESSION;p++) {
+    const sl = sess.slice(p*ITEMS_PER_PAGE,(p+1)*ITEMS_PER_PAGE);
+    const allDone = sl.every(it=>S.answers[it.id]?.mos);
+    const dots = document.getElementById('page-dots').children;
+    if (dots[p]) {
+      dots[p].classList.toggle('done', allDone);
+    }
+  }
+
+  // Check if last page and all answered
+  const isLast = page===PAGES_PER_SESSION-1;
+  const allSessAnswered = sess.every(it=>S.answers[it.id]?.mos);
+  const nextBtn = document.getElementById('btn-next');
+  if (isLast && allSessAnswered) {
+    nextBtn.textContent = 'Išsaugoti seansą ✓';
+    nextBtn.onclick = saveSession;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// NAVIGACIJA
+// ═══════════════════════════════════════════════════
+
+function changePage(dir) {
+  pauseAllAudio();
+  const newPage = S.curPage + dir;
+  if (newPage < 0 || newPage >= PAGES_PER_SESSION) return;
+  S.curPage = newPage;
+  renderPage();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════════════
+// IŠSAUGOJIMAS
+// ═══════════════════════════════════════════════════
+
+async function saveSession() {
+  const sess = S.sessions[S.curSess];
+  const missing = sess.filter(it=>!S.answers[it.id]?.mos);
+  if (missing.length>0) {
+    alert(`Dar ${missing.length} neįvertintų įrašų. Prašome įvertinti visus.`);
+    // Eiti į pirmą puslapį su neatsakytais
+    for (let p=0;p<PAGES_PER_SESSION;p++) {
+      const sl = sess.slice(p*ITEMS_PER_PAGE,(p+1)*ITEMS_PER_PAGE);
+      if (sl.some(it=>!S.answers[it.id]?.mos)) { S.curPage=p; renderPage(); break; }
+    }
+    return;
+  }
+
+  pauseAllAudio();
+
+  const rows = sess.map(item=>({
+    pid: S.pid,
+    session: S.curSess+1,
+    itemId: item.id,
+    model: item.model,
+    file: item.file,
+    mos: S.answers[item.id]?.mos||'',
+    emotion: S.answers[item.id]?.emotion||'',
+    plays: S.playCounts[item.id]||0,
+    ts: new Date().toISOString(),
+  }));
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({rows}),
+    });
+  } catch(e) { console.warn('Siuntimo klaida:', e); }
+
+  if (!S.doneSess.includes(S.curSess)) S.doneSess.push(S.curSess);
+
+  if (S.doneSess.length===3) {
+    show('done');
+  } else {
+    show('sessions');
+    renderSessions();
+  }
+}
+</script>
+</body>
+</html>
