@@ -292,7 +292,7 @@
         <li><strong>Pasirinkite emociją</strong> kurią girdite</li>
         <li>Apklausa sudaryta iš <strong>3 seansų</strong></li>
         <li>Kiekviename seanse — <strong>5 puslapiai po 10 įrašų</strong></li>
-        <li>Įvertinimai yra fiksuojami užbaigus visus seansus</li>
+        <li>Įvertinimai yra fiksuojami užbaigus kiekvieną seansą</li>
       </ol>
     </div>
     <p style="font-size:0.82rem;color:var(--grayDk)">Apklausa anoniminė. Duomenys naudojami tik moksliniais tikslais.</p>
@@ -343,7 +343,7 @@
 // KONFIGŪRACIJA
 // ═══════════════════════════════════════════════════
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUzi_Q16Umvuut19HR3TjsvBTmAB9mGKBATYEOsVx5jy0ypnWI6zaFrEdtcZoZBw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUzi_Q16Umvuut19HR3TjsvBTmAB9mGKBATYEOsVx5jy0ypnWI6zaFrEdtcZoZBw/exec'; // ← pakeiskite
 
 const MODELS = {};
 ['b1_lin','b1_neu','b1_liu',
@@ -591,7 +591,7 @@ function renderPage() {
                 onclick="setMos('${item.id}',${n})">${n}</button>
             `).join('')}
           </div>
-          <div class="mos-ends"><span>Nenatūrali</span><span>Natūrali</span></div>
+          <div class="mos-ends"><span style="color:white;font-weight:600">Nenatūrali</span><span style="color:white;font-weight:600">Natūrali</span></div>
         </div>
         <div class="q-block">
           <div class="q-lbl">2. Emocija</div>
@@ -627,6 +627,12 @@ function setupAudio(id) {
     if (t) t.textContent = fmt(audio.currentTime)+' / '+(isNaN(audio.duration)?'--:--':fmt(audio.duration));
   };
   audio.onplay = () => {
+    // Fiksuoti kai nuspaudžiamas play
+    if (!S.playCounts[id]) {
+      S.playCounts[id] = 1;
+      const pc = document.getElementById(`pcnt-${id}`);
+      if (pc) { pc.textContent = '✓'; pc.style.color = 'var(--teal)'; }
+    }
     // Pause others
     document.querySelectorAll('audio').forEach(a=>{ if(a!==audio) a.pause(); });
     const ic = document.getElementById(`picon-${id}`);
@@ -641,13 +647,10 @@ function setupAudio(id) {
     if (lb && !audio.ended) lb.textContent = 'Paspauskite ▶ tęsti';
   };
   audio.onended = () => {
-    S.playCounts[id] = (S.playCounts[id]||0)+1;
     const ic = document.getElementById(`picon-${id}`);
     if (ic) ic.setAttribute('d','M8 5v14l11-7z');
     const lb = document.getElementById(`albl-${id}`);
-    if (lb) lb.textContent = `Klausyta ${S.playCounts[id]}× — galite klausytis dar`;
-    const pc = document.getElementById(`pcnt-${id}`);
-    if (pc) pc.textContent = '×'+S.playCounts[id];
+    if (lb) lb.textContent = 'Išklausyta — galite klausytis dar';
     const f = document.getElementById(`afill-${id}`);
     if (f) f.style.width='100%';
   };
