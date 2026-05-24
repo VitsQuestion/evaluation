@@ -284,15 +284,15 @@
 <div id="sc-welcome" class="screen active">
   <div class="welcome-card">
     <h1>Kalbos sintezės vertinimas</h1>
-    <p>Šios apklausos tikslas — įvertinti dirbtinio intelekto sintetizuotos lietuviškos kalbos natūralumą ir emocinę raišką.</p>
+    <p>Šios apklausos tikslas — įvertinti dirbtinio intelekto sintezuotos lietuviškos kalbos natūralumą ir emocinę raišką.</p>
     <div class="instr">
       <ol>
-        <li><strong>Išklausykite</strong> kiekvieną garso įrašą</li>
+        <li><strong>Išklausykite</strong> garso įrašą</li>
         <li><strong>Įvertinkite natūralumą</strong> skalėje 1–5</li>
         <li><strong>Pasirinkite emociją</strong> kurią girdite</li>
-        <li>Apklausa sudaryta iš <strong>3 seansų</strong>, kiekvienas po ~15–20 min</li>
+        <li>Apklausa sudaryta iš <strong>3 seansų</strong></li>
         <li>Kiekviename seanse — <strong>5 puslapiai po 10 įrašų</strong></li>
-        <li>Tarp seansų galite <strong>pasiilsėti</strong></li>
+        <li>Įvertinimai yra fiksuojami užbaigus visus seansus</li>
       </ol>
     </div>
     <p style="font-size:0.82rem;color:var(--grayDk)">Apklausa anoniminė. Duomenys naudojami tik moksliniais tikslais.</p>
@@ -313,8 +313,10 @@
 <!-- Eval -->
 <div id="sc-eval" class="screen">
   <div class="eval-top">
+    <button class="btn btn-ghost" style="padding:0.3rem 0.8rem;font-size:0.78rem" onclick="goToSessions()">← Seansai</button>
     <span class="ev-badge" id="ev-badge">Seanso 1</span>
     <div class="ev-page-dots" id="page-dots"></div>
+    <div class="page-jump" id="page-jump"></div>
     <span class="ev-count" id="ev-count">Puslapis 1 / 5</span>
   </div>
   <div class="items-grid" id="items-grid"></div>
@@ -332,9 +334,7 @@
   <div class="done-card">
     <div class="done-icon">✓</div>
     <h2>Apklausa baigta!</h2>
-    <p>Dėkojame už dalyvavimą. Jūsų vertinimai išsaugoti ir bus naudojami magistro darbo tyrime.</p>
-    <br>
-    <p style="font-size:0.78rem;color:var(--grayDk)">Galite uždaryti šį langą.</p>
+    <p>Duomenys užfiksuoti. Ačiū!</p>
   </div>
 </div>
 
@@ -343,7 +343,7 @@
 // KONFIGŪRACIJA
 // ═══════════════════════════════════════════════════
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1FsL3aAlNEUfYjXl2Q7QxqzlrE7C_liliWInxe1J9RXjZtVES5FP_zNDWfUEphuiW/exec'; 
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUzi_Q16Umvuut19HR3TjsvBTmAB9mGKBATYEOsVx5jy0ypnWI6zaFrEdtcZoZBw/exec'; // ← pakeiskite
 
 const MODELS = {};
 ['b1_lin','b1_neu','b1_liu',
@@ -442,9 +442,8 @@ function renderSessions() {
     card.innerHTML = `
       <div class="sess-num">${i+1}</div>
       <div class="sess-info">
-        <div class="sess-title">Seanso ${i+1}</div>
-        <div class="sess-meta">50 garso įrašai · 5 puslapiai · ~15–20 min
-          ${!done && ans>0 ? ` · tęsiama (${ans}/50)`:''}</div>
+        <div class="sess-title">${['Pirmas seansas','Antras seansas','Trečias seansas'][i]}</div>
+        <div class="sess-meta">50 garso įrašai · 5 puslapiai${!done && ans>0 ? ` · tęsiama (${ans}/50)`:''}</div>
       </div>
       <span class="sess-badge ${done?'b-done':locked?'b-lock':'b-start'}">
         ${done?'✓ Atlikta':locked?'Užrakinta':ans>0?'Tęsti →':'Pradėti →'}
@@ -479,7 +478,7 @@ function renderPage() {
   const items = sess.slice(page*ITEMS_PER_PAGE,(page+1)*ITEMS_PER_PAGE);
 
   // Header info
-  document.getElementById('ev-badge').textContent = `Seanso ${S.curSess+1}`;
+  document.getElementById('ev-badge').textContent = ['Pirmas seansas','Antras seansas','Trečias seansas'][S.curSess];
   document.getElementById('ev-count').textContent = `Puslapis ${page+1} / ${PAGES_PER_SESSION}`;
 
   // Progress bar (answered in whole session)
@@ -500,6 +499,23 @@ function renderPage() {
     dotsEl.appendChild(d);
   }
 
+  // Page jump selector
+  const jumpEl = document.getElementById('page-jump');
+  if (jumpEl) {
+    jumpEl.innerHTML = '';
+    const sel = document.createElement('select');
+    sel.style.cssText = 'background:var(--bg3);color:var(--gray);border:1px solid var(--border);border-radius:6px;padding:0.25rem 0.5rem;font-size:0.78rem;font-family:IBM Plex Mono,monospace;cursor:pointer';
+    for (let p=0;p<PAGES_PER_SESSION;p++) {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = `Puslapis ${p+1}`;
+      if (p===page) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    sel.onchange = ()=>{ pauseAllAudio(); S.curPage=parseInt(sel.value); renderPage(); window.scrollTo({top:0,behavior:'smooth'}); };
+    jumpEl.appendChild(sel);
+  }
+
   // Nav status
   const pageUnanswered = items.filter(it=>!S.answers[it.id]?.mos).length;
   document.getElementById('nav-status').textContent =
@@ -508,18 +524,32 @@ function renderPage() {
   // Buttons
   const prevBtn = document.getElementById('btn-prev');
   const nextBtn = document.getElementById('btn-next');
-  prevBtn.disabled = page===0;
+
   const isLast = page===PAGES_PER_SESSION-1;
   const allSessAnswered = sess.every(it=>S.answers[it.id]?.mos);
+  const totalUnanswered = sess.filter(it=>!S.answers[it.id]?.mos).length;
 
-  if (isLast && allSessAnswered) {
-    nextBtn.textContent = 'Išsaugoti seansą ✓';
+  if (isLast) {
+    nextBtn.textContent = 'Baigti seansą →';
+    nextBtn.style.background = allSessAnswered ? 'var(--green)' : '';
+    nextBtn.style.color = 'white';
+    nextBtn.disabled = false;
     nextBtn.onclick = saveSession;
-  } else if (isLast) {
-    nextBtn.textContent = 'Peržiūrėti ←';
-    nextBtn.onclick = ()=>{ pauseAllAudio(); S.curPage=0; renderPage(); };
+
+    // Rodyti statusą
+    const status = document.getElementById('nav-status');
+    if (allSessAnswered) {
+      status.textContent = '✓ Visi įrašai įvertinti — galite baigti seansą';
+      status.style.color = 'var(--green)';
+    } else {
+      status.textContent = `⚠ Dar ${totalUnanswered} neįvertintų įrašų seanso metu`;
+      status.style.color = 'var(--orange)';
+    }
   } else {
     nextBtn.textContent = 'Toliau →';
+    nextBtn.style.background = '';
+    nextBtn.style.color = '';
+    nextBtn.disabled = false;
     nextBtn.onclick = ()=>changePage(1);
   }
 
@@ -571,8 +601,8 @@ function renderPage() {
               onclick="setEmo('${item.id}','linksma')">😊 Linksma</button>
             <button class="emo-btn ${ans.emotion==='neutrali'?'sel-neu':''}"
               onclick="setEmo('${item.id}','neutrali')">😐 Neutrali</button>
-            <button class="emo-btn ${ans.emotion==='liudna'?'sel-liu':''}"
-              onclick="setEmo('${item.id}','liudna')">😔 Liūdna</button>
+            <button class="emo-btn ${ans.emotion==='liūdna'?'sel-liu':''}"
+              onclick="setEmo('${item.id}','liūdna')">😔 Liūdna</button>
           </div>
         </div>
       </div>`;
@@ -659,7 +689,7 @@ function setEmo(id, emo) {
       b.classList.remove('sel-lin','sel-neu','sel-liu');
       if (b.textContent.includes('Linksma') && emo==='linksma') b.classList.add('sel-lin');
       if (b.textContent.includes('Neutrali') && emo==='neutrali') b.classList.add('sel-neu');
-      if (b.textContent.includes('Liūdna') && emo==='liudna') b.classList.add('sel-liu');
+      if (b.textContent.includes('Liūdna') && emo==='liūdna') b.classList.add('sel-liu');
     });
   }
   updatePageStatus();
@@ -670,8 +700,23 @@ function updatePageStatus() {
   const page  = S.curPage;
   const items = sess.slice(page*ITEMS_PER_PAGE,(page+1)*ITEMS_PER_PAGE);
   const pageUnanswered = items.filter(it=>!S.answers[it.id]?.mos).length;
-  document.getElementById('nav-status').textContent =
-    pageUnanswered>0 ? `Šiame puslapyje liko: ${pageUnanswered} neįvertintų` : '✓ Puslapis įvertintas';
+  const isLastPage2 = page===PAGES_PER_SESSION-1;
+  const totalUnanswered2 = sess.filter(it=>!S.answers[it.id]?.mos).length;
+  const status2 = document.getElementById('nav-status');
+  if (isLastPage2) {
+    if (totalUnanswered2===0) {
+      status2.textContent = '✓ Visi įrašai įvertinti — galite baigti seansą';
+      status2.style.color = 'var(--green)';
+      const nb2 = document.getElementById('btn-next');
+      if (nb2) nb2.style.background = 'var(--green)';
+    } else {
+      status2.textContent = `⚠ Dar ${totalUnanswered2} neįvertintų įrašų seanso metu`;
+      status2.style.color = 'var(--orange)';
+    }
+  } else {
+    status2.textContent = pageUnanswered>0 ? `Šiame puslapyje liko: ${pageUnanswered} neįvertintų` : '✓ Puslapis įvertintas';
+    status2.style.color = '';
+  }
 
   // Progress
   const totalAns = sess.filter(it=>S.answers[it.id]?.mos).length;
@@ -688,32 +733,22 @@ function updatePageStatus() {
     }
   }
 
-  // Check if last page and all answered
-  const isLast = page===PAGES_PER_SESSION-1;
-  const allSessAnswered = sess.every(it=>S.answers[it.id]?.mos);
-  const nextBtn = document.getElementById('btn-next');
-  if (isLast && allSessAnswered) {
-    nextBtn.textContent = 'Išsaugoti seansą ✓';
-    nextBtn.onclick = saveSession;
-  }
 }
 
 // ═══════════════════════════════════════════════════
 // NAVIGACIJA
 // ═══════════════════════════════════════════════════
 
-async function changePage(dir) {
+function goToSessions() {
+  pauseAllAudio();
+  show('sessions');
+  renderSessions();
+}
+
+function changePage(dir) {
   pauseAllAudio();
   const newPage = S.curPage + dir;
   if (newPage < 0 || newPage >= PAGES_PER_SESSION) return;
-
-  // Siųsti dabartinio puslapio duomenis kai einame pirmyn
-  if (dir > 0) {
-    const sess  = S.sessions[S.curSess];
-    const items = sess.slice(S.curPage*ITEMS_PER_PAGE,(S.curPage+1)*ITEMS_PER_PAGE);
-    await sendPage(items);
-  }
-
   S.curPage = newPage;
   renderPage();
   window.scrollTo({top:0, behavior:'smooth'});
@@ -723,47 +758,15 @@ async function changePage(dir) {
 // IŠSAUGOJIMAS
 // ═══════════════════════════════════════════════════
 
-async function sendPage(items) {
-  // Siųsti tik atsakytus šio puslapio įrašus
-  const rows = items
-    .filter(item => S.answers[item.id]?.mos)
-    .map(item => ({
-      pid:     S.pid,
-      session: S.curSess+1,
-      page:    S.curPage+1,
-      itemId:  item.id,
-      model:   item.model,
-      file:    item.file,
-      mos:     S.answers[item.id]?.mos||'',
-      emotion: S.answers[item.id]?.emotion||'',
-      plays:   S.playCounts[item.id]||0,
-      ts:      new Date().toISOString(),
-    }));
-
-  if (rows.length === 0) return;
-
-  try {
-    await fetch(SCRIPT_URL, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({rows}),
-    });
-    console.log(`Puslapis ${S.curPage+1} išsaugotas: ${rows.length} įrašų`);
-  } catch(e) {
-    console.warn('Siuntimo klaida:', e);
-  }
-}
-
 async function saveSession() {
   const sess = S.sessions[S.curSess];
-  const missing = sess.filter(it=>!S.answers[it.id]?.mos);
-  if (missing.length>0) {
-    alert(`Dar ${missing.length} neįvertintų įrašų. Prašome įvertinti visus.`);
-    for (let p=0;p<PAGES_PER_SESSION;p++) {
-      const sl = sess.slice(p*ITEMS_PER_PAGE,(p+1)*ITEMS_PER_PAGE);
-      if (sl.some(it=>!S.answers[it.id]?.mos)) { S.curPage=p; renderPage(); break; }
-    }
-    return;
+
+  // Užrakinti mygtuką
+  const nextBtn = document.getElementById('btn-next');
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.textContent = 'Išsaugoma...';
+    nextBtn.style.background = 'var(--grayDk)';
   }
 
   pauseAllAudio();
